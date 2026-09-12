@@ -1,0 +1,22 @@
+# Add project specific R8 rules here.
+# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+#
+# For more details, see
+#   https://d.android.com/r/tools/r8/keep-rules
+
+# If your project uses WebView with JS, uncomment the following
+# and specify the fully qualified class name to the JavaScript interface
+# class:
+#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
+#   public *;
+#}
+
+# ---- LSPosed 模块 ----
+# 入口类名写死在 assets/xposed_init，混淆后框架就找不到了，必须整体保留
+-keep class com.kai.kghook.hook.** { *; }
+
+# 激活状态检测：框架通过反射按方法名 hook，不能被重命名或内联
+-keep class com.kai.kghook.ModuleStatus { *; }
+-keepclassmembers class com.kai.kghook.ModuleStatus {
+    public boolean isModuleActive();
+}

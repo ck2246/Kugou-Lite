@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LSPosed 推荐作用域：酷狗音乐 + 模块自身（自身仅用于在界面显示“已激活”） -->
+    <string-array name="xposed_scope">
+        <item>com.kugou.android</item>
+        <item>com.kai.kghook</item>
+    </string-array>
+</resources>

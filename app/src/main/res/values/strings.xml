@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">kghook</string>
+    <string name="xposed_description">精简酷狗音乐底部导航：隐藏“视频 / K歌 / 福利”三个 Tab，仅保留首页与我的</string>
+</resources>
