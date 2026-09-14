@@ -1,6 +1,6 @@
 package com.kai.kghook.hook
 
-import com.kai.kghook.TabConfig
+import com.kai.kghook.LiteConfig
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedHelpers
@@ -16,7 +16,7 @@ class HookEntry : IXposedHookLoadPackage {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
-            TabConfig.TARGET_PACKAGE -> KugouTabHook.install(lpparam)
+            LiteConfig.TARGET_PACKAGE -> KugouUiHook.install(lpparam)
             SELF_PACKAGE -> hookSelf(lpparam)
         }
     }

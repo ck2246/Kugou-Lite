@@ -25,7 +25,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -60,18 +59,18 @@ private fun ModuleScreen() {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "酷狗底部导航精简",
+                text = "酷狗音乐精简",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "隐藏「视频 / K歌 / 福利」三个 Tab，只留首页和我的，减少底部栏的绘制与布局开销。",
+                text = "砍掉不用的底部 Tab、首页频道和快捷卡片，减少无谓的构建、布局与绘制。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             StatusCard(activated)
-            ScopeCard()
+            RulesCard()
             StepsCard()
             TroubleshootCard()
 
@@ -107,7 +106,7 @@ private fun StatusCard(activated: Boolean) {
             )
             Text(
                 text = if (activated) {
-                    "框架已注入本应用，酷狗主界面（${TabConfig.TARGET_PACKAGE}）会在下次冷启动时生效。"
+                    "框架已注入本应用，酷狗（${LiteConfig.TARGET_PACKAGE}）下次冷启动即生效。"
                 } else {
                     "尚未被框架注入。请按下方步骤在 LSPosed 中启用本模块，并把自身加入作用域。"
                 },
@@ -119,54 +118,95 @@ private fun StatusCard(activated: Boolean) {
 }
 
 @Composable
-private fun ScopeCard() {
-    SectionCard(title = "生效范围") {
-        InfoRow("目标应用", "${TabConfig.TARGET_APP_NAME}（${TabConfig.TARGET_PACKAGE}）")
-        HorizontalDivider(Modifier.padding(vertical = 10.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "隐藏",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.width(48.dp)
-            )
-            TabChips(TabConfig.HIDE_TAB_NAMES, hidden = true)
+private fun RulesCard() {
+    SectionCard(title = "精简规则") {
+        RuleBlock(
+            name = "底部导航",
+            desc = "隐藏后剩余两个 Tab 自动各占一半宽度。",
+            hide = LiteConfig.BOTTOM_HIDE_NAMES,
+            keep = LiteConfig.BOTTOM_KEEP_NAMES
+        )
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        RuleBlock(
+            name = "首页顶部频道",
+            desc = "白名单策略：除保留项外全部隐藏，包括需要右滑才露出的听播 / AI写歌 / 短剧，以及酷狗以后新增的频道。",
+            hide = listOf("听书", "儿童", "AI唱", "刷歌", "听播", "AI写歌", "短剧"),
+            keep = LiteConfig.TOP_KEEP_NAMES
+        )
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        RuleBlock(
+            name = "首页快捷入口卡片",
+            desc = "账户信息下方那一整块横向卡片。同 id 的「音频·听书」卡片不受影响。",
+            hide = LiteConfig.CARD_MATCH_KEYWORDS,
+            keep = null
+        )
+    }
+}
+
+@Composable
+private fun RuleBlock(name: String, desc: String, hide: List<String>, keep: List<String>?) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = desc,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        keep?.let {
+            LabelledChips(label = "保留", names = it, hidden = false)
         }
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "保留",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.width(48.dp)
-            )
-            TabChips(TabConfig.KEEP_TAB_NAMES, hidden = false)
+        LabelledChips(label = "隐藏", names = hide, hidden = true)
+    }
+}
+
+@Composable
+private fun LabelledChips(label: String, names: List<String>, hidden: Boolean) {
+    Row {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .width(36.dp)
+                .padding(top = 6.dp)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // 一行放不下就换行，用简单的分组避免引入 FlowRow 依赖
+            names.chunked(4).forEach { group ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    group.forEach { name ->
+                        Chip(name, hidden)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun TabChips(names: List<String>, hidden: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        names.forEach { name ->
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = if (hidden) {
-                    MaterialTheme.colorScheme.errorContainer
-                } else {
-                    MaterialTheme.colorScheme.secondaryContainer
-                }
-            ) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (hidden) {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    },
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                )
-            }
+private fun Chip(name: String, hidden: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (hidden) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
         }
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (hidden) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            },
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
     }
 }
 
@@ -177,7 +217,7 @@ private fun StepsCard() {
         StepText(2, "LSPosed → 模块 → 找到 kghook → 打开「启用模块」。")
         StepText(3, "在「作用域」里勾选 酷狗音乐（com.kugou.android）。")
         StepText(4, "如需在本页看到「模块已激活」，再把 kghook 自身也勾上（可选）。")
-        StepText(5, "回到 LSPosed 首页确认已重启 Zygisk，然后强制停止酷狗并重新打开。")
+        StepText(5, "强制停止酷狗后重新打开，热启动不会重新走 onCreate。")
     }
 }
 
@@ -198,11 +238,10 @@ private fun StepText(index: Int, text: String) {
 @Composable
 private fun TroubleshootCard() {
     SectionCard(title = "没生效怎么排查") {
-        BulletText("模块每次运行都会输出日志，优先看 LSPosed → 日志，过滤关键字 kghook。")
-        BulletText("或用数据线执行：adb logcat -s kghook")
-        BulletText("日志里有一份「结构快照」，会打印酷狗版本号、底部栏容器与每个 Tab 的真实 id 和文案。")
-        BulletText("酷狗改版后如果 Tab 文案变了，改 TabConfig.HIDE_TAB_NAMES 即可；如果连底部栏 id 都变了，模块会自动按特征搜索容器，一般无需改动。")
-        BulletText("务必确认酷狗是被「强制停止」后重开的，热启动不会重新走 onCreate。")
+        BulletText("模块每次运行都会输出日志：LSPosed → 日志，过滤 kghook；或数据线执行 adb logcat -s kghook。")
+        BulletText("日志里有一份「结构快照」，会打印酷狗版本号、底部栏与顶部频道栏每个子项的真实 id 和文案、以及所有同 id 卡片实例。")
+        BulletText("酷狗改版后：频道名变了改 LiteConfig 里的文案；混淆 id（urw / e3w1 / d3y…）变了不用管，模块会自动按特征搜索容器。")
+        BulletText("顶部频道栏在「我的」页装的是 音乐 / 关注，模块靠白名单判定，不会误伤那个页面。")
     }
 }
 
@@ -243,22 +282,6 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
             Spacer(Modifier.height(10.dp))
             content()
         }
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.width(72.dp)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
