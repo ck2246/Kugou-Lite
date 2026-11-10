@@ -16,7 +16,16 @@ class HookEntry : IXposedHookLoadPackage {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
-            LiteConfig.TARGET_PACKAGE -> KugouUiHook.install(lpparam)
+            LiteConfig.TARGET_PACKAGE -> {
+                // 先装开屏改道：它决定「第一个活动」，越早挂上越好，
+                // 免得界面精简的 onCreate 回调先跑、开屏页已经画出一帧
+                KugouSplashHook.install(lpparam)
+                // 广告总开关要在界面 hook 之前挂好：首页第一帧就可能去判定广告位
+                KugouAdKillHook.install(lpparam)
+                KugouUiHook.install(lpparam)
+                // 广告曝光监测与界面规则互不依赖，单独挂，类缺失时不影响前者
+                KugouAdMonitorHook.install(lpparam)
+            }
             SELF_PACKAGE -> hookSelf(lpparam)
         }
     }

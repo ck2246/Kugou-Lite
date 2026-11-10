@@ -14,9 +14,35 @@ object LiteConfig {
 
     const val TARGET_APP_NAME = "酷狗音乐"
 
-    /** 主界面 Activity；酷狗改版后往这里追加候选类名即可，其它逻辑不用动 */
-    val ACTIVITY_CANDIDATES = listOf(
-        "com.kugou.android.app.MediaActivity"
+    /**
+     * 主界面 Activity。
+     *
+     * 开屏改道和界面精简都指向它，酷狗改版换主界面时只改这一处。
+     */
+    const val MAIN_ACTIVITY = "com.kugou.android.app.MediaActivity"
+
+    /** 主界面候选类名；酷狗改版后往这里追加，其它逻辑不用动 */
+    val ACTIVITY_CANDIDATES = listOf(MAIN_ACTIVITY)
+
+    // ---------------- 开屏广告 ----------------
+
+    /**
+     * 是否跳过开屏广告。
+     *
+     * 打开后，从桌面启动时第一个活动直接是 [MAIN_ACTIVITY]，开屏页连同广告都不出现。
+     */
+    const val SKIP_SPLASH_AD = true
+
+    /**
+     * 开屏页候选类名。
+     *
+     * 真机界面分析抓到的启动类是 `...splash.foresplash.ForeNoBgSplashActivity`，
+     * 同包下通常还有带背景图的 ForeSplashActivity 和旧版 SplashActivity。
+     */
+    val SPLASH_CANDIDATES = listOf(
+        "com.kugou.android.app.splash.foresplash.ForeNoBgSplashActivity",
+        "com.kugou.android.app.splash.foresplash.ForeSplashActivity",
+        "com.kugou.android.app.splash.SplashActivity",
     )
 
     // ---------------- 底部导航 ----------------
@@ -97,4 +123,104 @@ object LiteConfig {
 
     /** 祖先的其它子树里出现这些文案就停手，这是第二道护栏，防止误伤账户区 */
     val CARD_PROTECT_NAMES = listOf("会员中心", "免费领会员券", "登录", "消息", "设置")
+
+    // ---------------- 信息流广告 ----------------
+
+    /** 评论流广告容器 id（真机值 0x7f0aa526，反编译对应 AdMonitorLinearLayout） */
+    const val AD_VIEW_ID = "clw1"
+
+    /**
+     * TME 广告位容器 id（真机视图树 + aapt2 dump resources 交叉确认）。
+     *
+     * 首页 banner 的真实层级是
+     * `RecyclerView > FrameLayout > tme_ad_container > FrameLayout > LinearLayout(「广告」角标)`，
+     * 所以隐藏 `tme_ad_container` 就能把图片、标题、角标整块收掉。
+     * 这两个 id 是语义命名、没被混淆，比按类名找稳得多。
+     */
+    val AD_CONTAINER_ID_NAMES = listOf(
+        "tme_ad_container",
+        "tme_ad_loading_next_ad_container",
+    )
+
+    /** 广告容器的类名特征（id 解析不到时的兜底） */
+    val AD_CONTAINER_CLASS_HINTS = listOf(
+        "AdMonitorLinearLayout",
+        "DynamicRelativeLayout",
+        "MineVipAdvertisingView",
+    )
+
+    /** 只装一个子 View 的纯包装外壳是否一并收掉，避免留白 */
+    const val AD_HIDE_SINGLE_CHILD_WRAPPER = true
+
+    // ---------------- 广告曝光监测 ----------------
+
+    /** 曝光监测控件类名（未混淆，比 id 稳） */
+    const val AD_MONITOR_CLASS =
+        "com.kugou.android.netmusic.discovery.advertise.widget.AdMonitorLinearLayout"
+
+    /** 起 1 秒轮询的私有方法（混淆名），清空它可省掉每秒探测与日志 */
+    const val AD_MONITOR_TICK_METHOD = "l"
+
+    /** 可见比例计算（未混淆），兜底恒返回 0 */
+    const val AD_MONITOR_PERCENT_METHOD = "getGlobalVisiblePercent"
+
+    /** 曝光回调注册方法；全仓库唯一调用点在 SongCommentAdProcessor.u */
+    const val AD_MONITOR_OBSERVER_METHOD = "setGlobalVisibilityObserver"
+
+    /** 是否把曝光监听器替换成空实现（必须换不能置空，控件里调用无空判断） */
+    const val AD_MONITOR_MUTE_OBSERVER = true
+
+    // ---------------- 广告总开关（TME SDK）----------------
+
+    /**
+     * 是否从腾讯音乐广告 SDK 的判定处把所有广告位判成关闭。
+     *
+     * 门面类 `com.tencentmusic.ad.TMEAds` 提供按广告位的布尔判定，
+     * 改成恒 false 等于告诉酷狗"这些广告位都没开"。
+     */
+    const val AD_DISABLE_TME = true
+
+    /** TME 广告 SDK 门面类 */
+    const val TME_FACADE_CLASS = "com.tencentmusic.ad.TMEAds"
+
+    /** 需要判成 false 的布尔判定（只回答"能不能用"，不破坏数据结构） */
+    val TME_FALSE_GATES = listOf(
+        "checkPosIdOpen(Ljava/lang/String;)Z",
+        "checkSplashInterval(Ljava/lang/String;Z)Z",
+        "getDynamicFloorEcpmStatus(Ljava/lang/String;)Z",
+    )
+
+    /**
+     * 诊断开关：界面长齐后把整棵视图树打进日志。
+     *
+     * 只在排查"某个广告位到底是什么控件"时临时打开，定位完必须关掉（日志会暴涨）。
+     */
+    const val DUMP_FULL_TREE = false
+
+    // ---------------- 开屏广告 Dialog ----------------
+
+    /**
+     * 开屏广告 Dialog 类（混淆名）。
+     *
+     * 真机 + 反编译确认：`rc.a extends android.app.Dialog`，由 SplashActivity 弹出，
+     * 方法只有 `show()` / `dismiss()` / `onAttachedToWindow()` 这一套。
+     * 也就是说开屏广告**不是一个 Activity，而是盖在开屏页上的全屏 Dialog**——
+     * 这正是之前按 Activity 类名怎么 hook 都拦不住的原因。
+     */
+    val SPLASH_DIALOG_CANDIDATES = listOf("rc.a")
+
+    /**
+     * 是否用「基类 Activity.onCreate + 类名含 splash」做通用改道。
+     *
+     * 酷狗的清单声明了 `com.kugou.android.app.splash.SplashActivity`，
+     * 但模块注入时 `loadClass` 拿不到它（插件化/壳机制），按名 hook 会落空。
+     * 挂在框架基类上就不依赖具体类能否提前加载，运行时按实例的真实类名判断。
+     */
+    const val SPLASH_BY_CLASS_NAME_HINT = true
+
+    /** 通用改道用的类名特征（小写匹配） */
+    const val SPLASH_CLASS_NAME_HINT = "splash"
+
+    /** 命中这些子串的 Activity 不改道：车机开屏属于另一条业务线，改了会让车机模式起不来 */
+    val SPLASH_CLASS_NAME_SKIP = listOf("hicar")
 }

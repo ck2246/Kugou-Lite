@@ -19,7 +19,7 @@ import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 酷狗音乐界面精简：底部导航、首页顶部频道栏、首页快捷入口卡片。
+ * 酷狗音乐界面精简：底部导航、首页顶部频道栏、首页快捷入口卡片、信息流广告。
  *
  * 实际结构（来自真机 UI dump）：
  * ```
@@ -251,11 +251,20 @@ internal object KugouUiHook {
                 val wanted = LinkedHashMap<String, Int>()
                 idOf(res, LiteConfig.TOP_BAR_ID)?.let { wanted[LiteConfig.TOP_BAR_ID] = it }
                 idOf(res, LiteConfig.CARD_ID)?.let { wanted[LiteConfig.CARD_ID] = it }
+                idOf(res, LiteConfig.AD_VIEW_ID)?.let { wanted[LiteConfig.AD_VIEW_ID] = it }
+                LiteConfig.AD_CONTAINER_ID_NAMES.forEach { name ->
+                    idOf(res, name)?.let { wanted[name] = it }
+                }
                 val found = if (wanted.isEmpty()) emptyMap() else collectByIds(root, wanted)
 
                 // 两个 or 的左操作数都会求值，不会因为前一个成功就跳过后面的处理
                 changed = applyTopBar(activity, res, found[LiteConfig.TOP_BAR_ID].orEmpty()) or changed
                 changed = applyQuickCard(res, found[LiteConfig.CARD_ID].orEmpty(), root) or changed
+
+                val adViews = ArrayList<View>()
+                found[LiteConfig.AD_VIEW_ID]?.let { adViews += it }
+                LiteConfig.AD_CONTAINER_ID_NAMES.forEach { name -> found[name]?.let { adViews += it } }
+                changed = applyAdViews(res, adViews, root) or changed
             }
             changed
         } catch (e: Throwable) {
@@ -552,6 +561,56 @@ internal object KugouUiHook {
         return keywords.any { keyword -> labels.any { it.contains(keyword) } }
     }
 
+    // ------------------------------------------------------------ 信息流广告
+
+    /**
+     * 隐藏信息流广告（[LiteConfig.AD_VIEW_ID] / [LiteConfig.AD_CONTAINER_ID_NAMES] / [LiteConfig.AD_CONTAINER_CLASS_HINTS]）。
+     *
+     * 两条定位路径互补：混淆 id 命中快，类名兜底稳——`AdMonitorLinearLayout`
+     * 是酷狗自己的广告监控容器，类名没混淆，比 `clw1` 这种 id 活得久。
+     *
+     * 广告挂在 RecyclerView 的 item 里，滚走会被回收、滚回来重新绑定，
+     * 所以和快捷卡片一样不能一次性设 GONE，必须交给常驻守卫每轮重扫；
+     * 也正因为反复设置，[setHidden] 才要记归属、能恢复。
+     */
+    private fun applyAdViews(res: Resources, byId: List<View>, root: ViewGroup): Boolean = safe("信息流广告") {
+        val candidates = LinkedHashSet<View>(byId)
+        if (candidates.isEmpty()) {
+            // id 解析不到（酷狗改版）才按类名全树兜底。
+            // 守卫每 100ms 跑一轮，id 有效时再走一遍全树是纯粹浪费
+            walk(root) { v ->
+                val name = v.javaClass.name
+                if (LiteConfig.AD_CONTAINER_CLASS_HINTS.any { name.contains(it) }) candidates += v
+            }
+            if (candidates.isNotEmpty()) {
+                warnOnce(
+                    "ad-by-class",
+                    "按 id=${LiteConfig.AD_VIEW_ID} 没定位到广告容器，已改用类名匹配" +
+                            "（${LiteConfig.AD_CONTAINER_CLASS_HINTS.joinToString("/")}，" +
+                            "命中 ${candidates.size} 个）"
+                )
+            }
+        }
+        if (candidates.isEmpty()) return@safe false
+
+        var changed = false
+        var matched = 0
+        for (view in candidates) {
+            matched++
+            val labels = labelsOf(view, 6)
+            if (setHidden(view, true, res, "信息流广告", labels)) changed = true
+
+            if (!LiteConfig.AD_HIDE_SINGLE_CHILD_WRAPPER) continue
+            val wrapper = view.parent as? ViewGroup ?: continue
+            // 只收「纯包装」：整层就这一个子 View，且它不是列表容器本身。
+            // childCount > 1 的容器可能还混装正经内容，绝不能顺着往上收
+            if (wrapper.childCount != 1 || isRecyclerLike(wrapper)) continue
+            if (setHidden(wrapper, true, res, "信息流广告（外壳）", labels)) changed = true
+        }
+        if (changed) logOnce("ad-hidden", "信息流广告：命中 $matched 处，已隐藏")
+        changed
+    }
+
     // ---------------------------------------------------------------- 通用工具
 
     /**
@@ -807,6 +866,10 @@ internal object KugouUiHook {
 
             XLog.i("---- 内容区顶层（深度 3）----")
             activity.findViewById<ViewGroup>(android.R.id.content)?.let { dumpTree(it, 0, 3) }
+            if (LiteConfig.DUMP_FULL_TREE) {
+                XLog.i("---- 全量视图树（诊断用，定位广告容器后应关闭 DUMP_FULL_TREE）----")
+                (activity.window?.decorView as? ViewGroup)?.let { dumpTree(it, 0, 7) }
+            }
             XLog.i("==============================")
         } catch (e: Throwable) {
             XLog.e("结构快照输出失败: $e")

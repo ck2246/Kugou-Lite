@@ -64,7 +64,7 @@ private fun ModuleScreen() {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "砍掉不用的底部 Tab、首页频道和快捷卡片，减少无谓的构建、布局与绘制。",
+                text = "跳过开屏广告，并砍掉不用的底部 Tab、首页频道和快捷卡片，减少无谓的构建、布局与绘制。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -120,6 +120,8 @@ private fun StatusCard(activated: Boolean) {
 @Composable
 private fun RulesCard() {
     SectionCard(title = "精简规则") {
+        SplashRuleBlock()
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
         RuleBlock(
             name = "底部导航",
             desc = "隐藏后剩余两个 Tab 自动各占一半宽度。",
@@ -140,6 +142,51 @@ private fun RulesCard() {
             hide = LiteConfig.CARD_MATCH_KEYWORDS,
             keep = null
         )
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        RuleBlock(
+            name = "广告总开关",
+            desc = if (LiteConfig.AD_DISABLE_TME) {
+                "在腾讯音乐广告 SDK（com.tencentmusic.ad.TMEAds）的广告位判定处直接判成关闭：" +
+                    "checkPosIdOpen / checkSplashInterval / getDynamicFloorEcpmStatus 一律返回 false。" +
+                    "我的页 banner、信息流、激励、开屏等所有 TME 广告位共用这道闸。"
+            } else {
+                "已关闭（LiteConfig.AD_DISABLE_TME = false），只保留下方的容器隐藏。"
+            },
+            hide = listOf("全部广告位"),
+            keep = null
+        )
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        RuleBlock(
+            name = "广告容器（视觉兜底）",
+            desc = "万一某版本绕过上述判定，这些广告专用容器仍会被按类名隐藏：" +
+                LiteConfig.AD_CONTAINER_CLASS_HINTS.joinToString(" / ") +
+                "。只装它一个子 View 的外壳会一并收掉，避免留白。",
+            hide = listOf("广告容器", "外壳"),
+            keep = null
+        )
+    }
+}
+
+@Composable
+private fun SplashRuleBlock() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "开屏广告",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = if (LiteConfig.SKIP_SPLASH_AD) {
+                "从桌面启动时把第一个活动直接换成主界面，开屏页（ForeNoBgSplashActivity）连同它加载的广告都不出现；" +
+                    "推送、深链等非桌面启动仍走原生流程，避免吞掉跳转目标。"
+            } else {
+                "已关闭（LiteConfig.SKIP_SPLASH_AD = false），启动链路与官方版一致。"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LabelledChips(label = "跳过", names = listOf("开屏页", "开屏广告"), hidden = true)
+        LabelledChips(label = "进入", names = listOf("主界面"), hidden = false)
     }
 }
 
